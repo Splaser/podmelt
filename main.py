@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+import re
 
 from converter import convert_mp4_to_m4a
 from tagging import tag_m4a
@@ -10,8 +11,15 @@ from utils import (
 )
 
 DEFAULT_INPUT_DIR = (
-    r"Y:\YTF\youtube频道\lifeano会员节目\第零次世界大战\1. 1740-1748.奥地利王位继承战争"
+    r"Y:\YTF\youtube频道\lifeano会员节目\第零次世界大战\3. 1853-1856.克里米亚战争"
 )
+
+
+def infer_album_from_path(output_path: Path) -> str:
+    # 获取最后一级文件夹名
+    folder_name = output_path.parent.name
+    # 去掉开头数字和点，例如 "01. 日俄战争 1904–1905" -> "日俄战争 1904–1905"
+    return re.sub(r"^\d+\.\s*", "", folder_name)
 
 
 def collect_inputs(input_path: Path, recursive: bool = False) -> list[Path]:
@@ -175,11 +183,15 @@ def main() -> int:
         print()
         print(f"[{idx}/{len(inputs)}] {item.name}")
 
+        
+        out_path = default_output_path(item, output_dir)
+        dynamic_album = infer_album_from_path(out_path)
+
         ok = process_one(
             item,
             output_dir=output_dir,
             artist=args.artist,
-            album=args.album,
+            album=dynamic_album,
             description=args.description,
             bitrate=args.bitrate,
             no_cover=args.no_cover,
