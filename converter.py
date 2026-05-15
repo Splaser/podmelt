@@ -3,6 +3,8 @@ import shutil
 import subprocess
 import tempfile
 
+_album_cover_cache: dict[str, Path] = {}  # 全局缓存专辑封面
+
 
 def has_ffmpeg() -> bool:
     return shutil.which("ffmpeg") is not None
@@ -14,11 +16,8 @@ def convert_mp4_to_m4a(
     *,
     bitrate: str = "128k",
     overwrite: bool = False,
+    denoise: bool = True,  # 新增参数
 ) -> bool:
-    """
-    Convert local video file to M4A audio.
-    """
-
     if not has_ffmpeg():
         print("[ERROR] ffmpeg not found. Please install ffmpeg first.")
         return False
@@ -43,12 +42,15 @@ def convert_mp4_to_m4a(
         "aac",
         "-b:a",
         bitrate,
-        "-movflags",
-        "+faststart",
-        str(output_path),
     ]
 
-    print(f"[INFO] converting: {input_path.name} -> {output_path.name}")
+    if denoise:
+        # 加上 afftdn 滤波
+        cmd += ["-af", "afftdn"]
+
+    cmd += ["-movflags", "+faststart", str(output_path)]
+
+    print(f"[INFO] converting: {input_path.name} -> {output_path.name} (denoise={denoise})")
 
     try:
         result = subprocess.run(cmd)
@@ -67,14 +69,19 @@ def extract_cover_frame(
     input_path: Path,
     *,
     seek_time: str = "00:00:03",
+    album_name: str = "default_album"
 ) -> Path | None:
     """
-    Extract one video frame as temporary JPG cover.
+    Extract one video frame as album cover for the entire album.
 
-    seek_time:
-    - default 00:00:03
-    - avoids black frame / opening fade-in in many videos
+    - Only extracts once per album_name
+    - Returns cached Path for subsequent calls
     """
+    global _album_cover_cache
+
+    # 如果已经生成过，直接返回缓存
+    if album_name in _album_cover_cache:
+        return _album_cover_cache[album_name]
 
     if not has_ffmpeg():
         print("[ERROR] ffmpeg not found. Please install ffmpeg first.")
@@ -84,7 +91,7 @@ def extract_cover_frame(
         print(f"[ERROR] input not found: {input_path}")
         return None
 
-    tmp_dir = Path(tempfile.mkdtemp(prefix="podmelt_"))
+    tmp_dir = Path(tempfile.mkdtemp(prefix=f"podmelt_{album_name}_"))
     cover_path = tmp_dir / "cover.jpg"
 
     cmd = [
@@ -101,7 +108,7 @@ def extract_cover_frame(
         str(cover_path),
     ]
 
-    print(f"[INFO] extracting cover frame: {input_path.name} @ {seek_time}")
+    print(f"[INFO] extracting album cover: {input_path.name} @ {seek_time}")
 
     try:
         result = subprocess.run(cmd)
@@ -109,6 +116,8 @@ def extract_cover_frame(
             print(f"[WARN] cover frame extraction failed: {input_path}")
             return None
 
+        # 缓存起来，全专辑复用
+        _album_cover_cache[album_name] = cover_path
         return cover_path
 
     except KeyboardInterrupt:

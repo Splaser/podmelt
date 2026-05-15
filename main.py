@@ -1,8 +1,7 @@
 import argparse
 from pathlib import Path
-import shutil
 
-from converter import convert_mp4_to_m4a, extract_cover_frame
+from converter import convert_mp4_to_m4a
 from tagging import tag_m4a
 from utils import (
     default_output_path,
@@ -10,8 +9,9 @@ from utils import (
     is_video_file,
 )
 
-
-DEFAULT_INPUT_DIR = r"Y:\YTF\youtube频道\lifeano会员节目\神圣罗马帝国史 A.D.962-1806"
+DEFAULT_INPUT_DIR = (
+    r"Y:\YTF\youtube频道\lifeano会员节目\第零次世界大战\1. 1740-1748.奥地利王位继承战争"
+)
 
 
 def collect_inputs(input_path: Path, recursive: bool = False) -> list[Path]:
@@ -33,41 +33,57 @@ def process_one(
     album: str,
     description: str,
     bitrate: str,
-    cover_time: str,
     no_cover: bool,
     overwrite: bool,
+    cover: str | None = None,
 ) -> bool:
     output_path = default_output_path(input_path, output_dir)
 
+    # 转码
     ok = convert_mp4_to_m4a(
         input_path=input_path,
         output_path=output_path,
         bitrate=bitrate,
         overwrite=overwrite,
     )
-
     if not ok:
         return False
 
     title = guess_title_from_path(input_path)
 
+    # 处理封面
     cover_path = None
-    if not no_cover:
-        cover_path = extract_cover_frame(input_path, seek_time=cover_time)
+    if cover:
+        cover_path = Path(cover)
+    else:
+        # 默认用输出目录下的 logo.png
+        if output_dir:
+            default_logo = output_dir / "logo.png"
+            if default_logo.exists():
+                cover_path = default_logo
 
-    tagged = tag_m4a(
-        output_path,
-        title=title,
-        artist=artist,
-        album=album,
-        description=description,
-        cover_path=cover_path,
-    )
+    # 如果显式声明 no_cover 或 logo.png 不存在，则不写封面
+    if cover_path and not no_cover:
+        tag_m4a(
+            output_path,
+            title=title,
+            artist=artist,
+            album=album,
+            description=description,
+            cover_path=cover_path,
+        )
+    else:
+        # 没有封面时只写基础 metadata
+        tag_m4a(
+            output_path,
+            title=title,
+            artist=artist,
+            album=album,
+            description=description,
+            cover_path=None,
+        )
 
-    if cover_path:
-        shutil.rmtree(cover_path.parent, ignore_errors=True)
-
-    return tagged
+    return True
 
 
 def main() -> int:
@@ -113,9 +129,8 @@ def main() -> int:
     )
 
     parser.add_argument(
-        "--cover-time",
-        default="00:00:05",
-        help="Timestamp used for extracting cover frame, default: 00:00:05",
+        "--cover",
+        help="Path to album cover image (PNG/JPG). If not provided, default to OUTPUT_DIR/logo.png",
     )
 
     parser.add_argument(
@@ -167,9 +182,9 @@ def main() -> int:
             album=args.album,
             description=args.description,
             bitrate=args.bitrate,
-            cover_time=args.cover_time,
             no_cover=args.no_cover,
             overwrite=args.overwrite,
+            cover=args.cover,
         )
 
         if ok:
