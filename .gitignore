@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+*.txt
+*.mp3
+*.mp4
+*.m4a
