@@ -5,22 +5,27 @@ from tagging import tag_m4a
 from utils import is_video_file, guess_title_from_path, sanitize_filename
 
 # 输入 / 输出
-INPUT_DIR = r"Y:\YTF\youtube频道\lifeano会员节目\海洋帝国"
-OUTPUT_ROOT = r"S:\袁腾飞频道\海洋帝国"
+INPUT_DIR = r"Y:\YTF\youtube频道\lifeano会员节目\中东战争"
+OUTPUT_ROOT = r"S:\袁腾飞频道\中东战争"
 ARTIST_NAME = "lifeano"
 BITRATE = "128k"
 OVERWRITE = False
+
 
 def infer_album_from_path(file_path: Path) -> str:
     """用最近父目录名生成 album，去掉开头数字和点"""
     folder_name = file_path.parent.name
     return re.sub(r"^\d+\.\s*", "", folder_name)
 
+
 def collect_mp4_files(top_path: Path):
     """递归收集所有支持的视频文件"""
     return [f for f in top_path.rglob("*") if is_video_file(f)]
 
-def process_one(input_path: Path, input_root: Path, output_root: Path, cover_path: Path | None):
+
+def process_one(
+    input_path: Path, input_root: Path, output_root: Path, cover_path: Path | None
+):
     """单文件处理：转码 + 写标签，保持原目录结构"""
     # 构造输出目录：在 output_root 下保留原输入结构
     relative_path = input_path.parent.relative_to(input_root)
@@ -50,9 +55,10 @@ def process_one(input_path: Path, input_root: Path, output_root: Path, cover_pat
         artist=ARTIST_NAME,
         album=album,
         description="",
-        cover_path=cover_path,   # 统一封面
+        cover_path=cover_path,  # 统一封面
     )
     return True
+
 
 def main():
     input_root = Path(INPUT_DIR)
@@ -81,6 +87,7 @@ def main():
             failed += 1
 
     print(f"\n[DONE] success={success}, failed={failed}")
+
 
 if __name__ == "__main__":
     main()
